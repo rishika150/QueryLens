@@ -1,277 +1,200 @@
 package com.rishika.sqlanalyzer.ui;
 
-import javax.swing.*;
-import javax.swing.border.EmptyBorder;
-import java.awt.*;
 import com.rishika.sqlanalyzer.config.DatabaseConfig;
-import com.rishika.sqlanalyzer.service.ConnectionTester;
 import com.rishika.sqlanalyzer.model.QueryResult;
+import com.rishika.sqlanalyzer.service.ConnectionTester;
+import com.rishika.sqlanalyzer.service.ExplainService;
 import com.rishika.sqlanalyzer.service.QueryExecutor;
+import com.rishika.sqlanalyzer.ui.panels.*;
+
+import javax.swing.*;
+import java.awt.*;
 
 public class MainFrame extends JFrame {
 
-    private JTextField hostField;
-    private JTextField portField;
-    private JTextField databaseField;
-    private JTextField usernameField;
-    private JPasswordField passwordField;
+    private final ConnectionPanel connectionPanel = new ConnectionPanel();
+    private final EditorPanel editorPanel = new EditorPanel();
+    private final ToolbarPanel toolbarPanel = new ToolbarPanel();
+    private final ResultPanel resultPanel = new ResultPanel();
+    private final AnalyzerPanel analyzerPanel = new AnalyzerPanel();
+    private final StatusBar statusBar = new StatusBar();
 
-    private JButton connectButton;
-    private JButton executeButton;
-    private JButton explainButton;
-    private JButton clearButton;
-
-    private JTextArea queryArea;
-    private JTable resultTable;
-
-    private JLabel statusLabel;
-    private JLabel executionTimeLabel;
-
-    private JTextArea suggestionArea;
     private final ConnectionTester connectionTester = new ConnectionTester();
     private final QueryExecutor queryExecutor = new QueryExecutor();
+    private final ExplainService explainService = new ExplainService();
+
+    private DatabaseConfig activeConfig;
+
     public MainFrame() {
-        setTitle("SQL Performance Analyzer");
-        setSize(1250, 820);
+        setTitle("QueryLens - SQL Performance Analyzer");
+        setSize(1350, 850);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
         setLayout(new BorderLayout());
-        add(createHeaderPanel(), BorderLayout.NORTH);
-        add(createMainPanel(), BorderLayout.CENTER);
-        add(createFooterPanel(), BorderLayout.SOUTH);
-        attachEventHandlers();
+
+        add(buildHeader(), BorderLayout.NORTH);
+        add(buildWorkspace(), BorderLayout.CENTER);
+        add(statusBar, BorderLayout.SOUTH);
+
+        wireEvents();
     }
 
-    private JPanel createHeaderPanel() {
+    private JPanel buildHeader() {
         JPanel header = new JPanel(new BorderLayout());
-        header.setBackground(new Color(35, 45, 60));
-        header.setBorder(new EmptyBorder(14, 20, 14, 20));
 
-        JLabel title = new JLabel("SQL Performance Analyzer");
-        title.setForeground(Color.WHITE);
+        JLabel title = new JLabel("QueryLens  |  SQL Performance Analyzer");
         title.setFont(new Font("Arial", Font.BOLD, 24));
+        title.setBorder(BorderFactory.createEmptyBorder(12, 14, 8, 14));
 
-        statusLabel = new JLabel("Not Connected");
-        statusLabel.setForeground(new Color(255, 180, 80));
-        statusLabel.setFont(new Font("Arial", Font.BOLD, 14));
-
-        header.add(title, BorderLayout.WEST);
-        header.add(statusLabel, BorderLayout.EAST);
+        header.add(title, BorderLayout.NORTH);
+        header.add(connectionPanel, BorderLayout.CENTER);
+        header.add(toolbarPanel, BorderLayout.SOUTH);
 
         return header;
     }
 
-    private JPanel createMainPanel() {
-        JPanel main = new JPanel(new BorderLayout(12, 12));
-        main.setBorder(new EmptyBorder(12, 12, 12, 12));
-
-        main.add(createConnectionPanel(), BorderLayout.NORTH);
-
-        JSplitPane verticalSplit = new JSplitPane(
-                JSplitPane.VERTICAL_SPLIT,
-                createEditorPanel(),
-                createResultAndSuggestionPanel()
+    private JSplitPane buildWorkspace() {
+        JSplitPane editorAndAnalyzer = new JSplitPane(
+                JSplitPane.HORIZONTAL_SPLIT,
+                editorPanel,
+                analyzerPanel
         );
 
-        verticalSplit.setResizeWeight(0.35);
-        verticalSplit.setDividerSize(8);
+        editorAndAnalyzer.setResizeWeight(0.75);
+        editorAndAnalyzer.setContinuousLayout(true);
 
-        main.add(verticalSplit, BorderLayout.CENTER);
-
-        return main;
-    }
-
-    private JPanel createConnectionPanel() {
-        JPanel panel = new JPanel(new BorderLayout(10, 10));
-        panel.setBorder(BorderFactory.createTitledBorder("Database Connection"));
-
-        JPanel fieldsPanel = new JPanel(new GridLayout(2, 5, 10, 8));
-
-        hostField = new JTextField("localhost");
-        portField = new JTextField("3306");
-        databaseField = new JTextField("test");
-        usernameField = new JTextField("root");
-        passwordField = new JPasswordField();
-
-        fieldsPanel.add(new JLabel("Host"));
-        fieldsPanel.add(new JLabel("Port"));
-        fieldsPanel.add(new JLabel("Database"));
-        fieldsPanel.add(new JLabel("Username"));
-        fieldsPanel.add(new JLabel("Password"));
-
-        fieldsPanel.add(hostField);
-        fieldsPanel.add(portField);
-        fieldsPanel.add(databaseField);
-        fieldsPanel.add(usernameField);
-        fieldsPanel.add(passwordField);
-
-        connectButton = new JButton("Test Connection");
-        connectButton.setPreferredSize(new Dimension(150, 35));
-
-        panel.add(fieldsPanel, BorderLayout.CENTER);
-        panel.add(connectButton, BorderLayout.EAST);
-
-        return panel;
-    }
-
-    private JPanel createEditorPanel() {
-        JPanel panel = new JPanel(new BorderLayout(10, 10));
-        panel.setBorder(BorderFactory.createTitledBorder("SQL Editor"));
-
-        queryArea = new JTextArea();
-        queryArea.setFont(new Font("Monospaced", Font.PLAIN, 15));
-        queryArea.setText("SELECT * FROM your_table LIMIT 10;");
-        queryArea.setBorder(new EmptyBorder(8, 8, 8, 8));
-
-        JScrollPane queryScroll = new JScrollPane(queryArea);
-
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-
-        executeButton = new JButton("Execute Query");
-        explainButton = new JButton("EXPLAIN Plan");
-        clearButton = new JButton("Clear");
-
-        buttonPanel.add(executeButton);
-        buttonPanel.add(explainButton);
-        buttonPanel.add(clearButton);
-
-        panel.add(queryScroll, BorderLayout.CENTER);
-        panel.add(buttonPanel, BorderLayout.SOUTH);
-
-        return panel;
-    }
-
-    private JPanel createResultAndSuggestionPanel() {
-        JSplitPane splitPane = new JSplitPane(
+        JSplitPane workspace = new JSplitPane(
                 JSplitPane.VERTICAL_SPLIT,
-                createResultPanel(),
-                createSuggestionPanel()
+                editorAndAnalyzer,
+                resultPanel
         );
 
-        splitPane.setResizeWeight(0.72);
-        splitPane.setDividerSize(8);
+        workspace.setResizeWeight(0.62);
+        workspace.setContinuousLayout(true);
 
-        JPanel wrapper = new JPanel(new BorderLayout());
-        wrapper.add(splitPane, BorderLayout.CENTER);
-
-        return wrapper;
+        return workspace;
     }
 
-    private JPanel createResultPanel() {
-        JPanel panel = new JPanel(new BorderLayout(8, 8));
-        panel.setBorder(BorderFactory.createTitledBorder("Query Results"));
-
-        resultTable = new JTable();
-        resultTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
-        resultTable.setRowHeight(24);
-
-        JScrollPane tableScroll = new JScrollPane(resultTable);
-
-        executionTimeLabel = new JLabel("Execution Time: -");
-        executionTimeLabel.setBorder(new EmptyBorder(5, 5, 5, 5));
-        executionTimeLabel.setFont(new Font("Arial", Font.BOLD, 13));
-
-        panel.add(tableScroll, BorderLayout.CENTER);
-        panel.add(executionTimeLabel, BorderLayout.SOUTH);
-
-        return panel;
-    }
-
-    private JPanel createSuggestionPanel() {
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.setBorder(BorderFactory.createTitledBorder("Optimization Suggestions"));
-
-        suggestionArea = new JTextArea();
-        suggestionArea.setEditable(false);
-        suggestionArea.setFont(new Font("Arial", Font.PLAIN, 14));
-        suggestionArea.setBorder(new EmptyBorder(8, 8, 8, 8));
-        suggestionArea.setText("Suggestions will appear here after running a query.");
-
-        JScrollPane suggestionScroll = new JScrollPane(suggestionArea);
-
-        panel.add(suggestionScroll, BorderLayout.CENTER);
-
-        return panel;
-    }
-
-    private JPanel createFooterPanel() {
-        JPanel footer = new JPanel(new BorderLayout());
-        footer.setBorder(new EmptyBorder(6, 12, 6, 12));
-
-        JLabel footerText = new JLabel("Developer Tool | Java + JDBC + MySQL");
-        footerText.setFont(new Font("Arial", Font.PLAIN, 12));
-
-        footer.add(footerText, BorderLayout.WEST);
-
-        return footer;
-    }
-    private void attachEventHandlers() {
-        connectButton.addActionListener(e -> testConnection());
-        executeButton.addActionListener(e -> executeQuery());
-        clearButton.addActionListener(e -> queryArea.setText(""));
+    private void wireEvents() {
+        connectionPanel.getConnectButton().addActionListener(e -> testConnection());
+        toolbarPanel.getExecuteButton().addActionListener(e -> executeQuery());
+        toolbarPanel.getExplainButton().addActionListener(e -> explainQuery());
+        toolbarPanel.getClearButton().addActionListener(e -> clearEditor());
     }
 
     private void testConnection() {
-        DatabaseConfig config = getDatabaseConfig();
+        DatabaseConfig config = buildConfigFromPanel();
 
-        boolean isConnected = connectionTester.test(config);
+        boolean connected = connectionTester.test(config);
 
-        if (isConnected) {
-            statusLabel.setText("Connected");
-            statusLabel.setForeground(new Color(80, 220, 120));
+        if (connected) {
+            activeConfig = config;
+            statusBar.setConnected(true);
+            statusBar.setStatus("Connected to database: " + connectionPanel.getDatabase());
 
             JOptionPane.showMessageDialog(
                     this,
-                    "Database connected successfully!",
-                    "Success",
+                    "Database connected successfully.",
+                    "Connection Successful",
                     JOptionPane.INFORMATION_MESSAGE
             );
         } else {
-            statusLabel.setText("Connection Failed");
-            statusLabel.setForeground(new Color(255, 90, 90));
+            activeConfig = null;
+            statusBar.setConnected(false);
+            statusBar.setStatus("Connection failed. Check database credentials.");
 
             JOptionPane.showMessageDialog(
                     this,
-                    "Could not connect to database. Check host, port, database, username, and password.",
+                    "Could not connect to database.",
                     "Connection Failed",
                     JOptionPane.ERROR_MESSAGE
             );
         }
     }
 
-    private DatabaseConfig getDatabaseConfig() {
-        return new DatabaseConfig(
-                hostField.getText().trim(),
-                portField.getText().trim(),
-                databaseField.getText().trim(),
-                usernameField.getText().trim(),
-                new String(passwordField.getPassword())
-        );
-    }
     private void executeQuery() {
-        DatabaseConfig config = getDatabaseConfig();
-        String sql = queryArea.getText();
+        if (activeConfig == null) {
+            statusBar.setStatus("Please connect to a database first.");
+            JOptionPane.showMessageDialog(this, "Please connect to a database first.");
+            return;
+        }
 
-        QueryResult result = queryExecutor.execute(config, sql);
+        String sql = editorPanel.getQuery();
+        QueryResult result = queryExecutor.execute(activeConfig, sql);
 
-        resultTable.setModel(result.getTableModel());
-        executionTimeLabel.setText("Execution Time: " + result.getExecutionTimeMillis() + " ms");
+        resultPanel.setTableModel(result.getTableModel());
+        resultPanel.setExecutionTime(result.getExecutionTimeMillis());
+
+        analyzerPanel.setRowsReturned(String.valueOf(result.getTableModel().getRowCount()));
+        analyzerPanel.setQueryType(getQueryType(sql));
+        analyzerPanel.setPerformanceScore(result.isSuccess() ? "85 / 100" : "-- / 100");
+
+        statusBar.setStatus(result.getMessage());
 
         if (result.isSuccess()) {
-            JOptionPane.showMessageDialog(
-                    this,
-                    result.getMessage(),
-                    "Query Executed",
-                    JOptionPane.INFORMATION_MESSAGE
-            );
+            analyzerPanel.setSuggestions("Basic analysis complete. Advanced suggestions will be added next.");
         } else {
-            JOptionPane.showMessageDialog(
-                    this,
-                    result.getMessage(),
-                    "SQL Error",
-                    JOptionPane.ERROR_MESSAGE
-            );
+            analyzerPanel.setSuggestions("Error: " + result.getMessage());
+            JOptionPane.showMessageDialog(this, result.getMessage(), "SQL Error", JOptionPane.ERROR_MESSAGE);
         }
+    }
+
+    private void explainQuery() {
+        if (activeConfig == null) {
+            statusBar.setStatus("Please connect to a database first.");
+            JOptionPane.showMessageDialog(this, "Please connect to a database first.");
+            return;
+        }
+
+        String sql = editorPanel.getQuery();
+        QueryResult result = explainService.explain(activeConfig, sql);
+
+        resultPanel.setTableModel(result.getTableModel());
+        resultPanel.setExecutionTime(result.getExecutionTimeMillis());
+
+        analyzerPanel.setQueryType("EXPLAIN");
+        analyzerPanel.setRowsReturned(String.valueOf(result.getTableModel().getRowCount()));
+        analyzerPanel.setPerformanceScore(result.isSuccess() ? "EXPLAIN" : "--");
+
+        statusBar.setStatus(result.getMessage());
+
+        if (!result.isSuccess()) {
+            analyzerPanel.setSuggestions("Error: " + result.getMessage());
+            JOptionPane.showMessageDialog(this, result.getMessage(), "EXPLAIN Error", JOptionPane.ERROR_MESSAGE);
+        } else {
+            analyzerPanel.setSuggestions("EXPLAIN plan generated successfully. Index analysis will be added next.");
+        }
+    }
+
+    private void clearEditor() {
+        editorPanel.clearQuery();
+        statusBar.setStatus("SQL editor cleared.");
+    }
+
+    private DatabaseConfig buildConfigFromPanel() {
+        return new DatabaseConfig(
+                connectionPanel.getHost(),
+                connectionPanel.getPort(),
+                connectionPanel.getDatabase(),
+                connectionPanel.getUsername(),
+                connectionPanel.getPassword()
+        );
+    }
+
+    private String getQueryType(String sql) {
+        if (sql == null || sql.isBlank()) return "-";
+
+        String upper = sql.trim().toUpperCase();
+
+        if (upper.startsWith("SELECT")) return "SELECT";
+        if (upper.startsWith("INSERT")) return "INSERT";
+        if (upper.startsWith("UPDATE")) return "UPDATE";
+        if (upper.startsWith("DELETE")) return "DELETE";
+        if (upper.startsWith("CREATE")) return "CREATE";
+        if (upper.startsWith("ALTER")) return "ALTER";
+        if (upper.startsWith("DROP")) return "DROP";
+
+        return "OTHER";
     }
 }
