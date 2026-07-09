@@ -5,6 +5,8 @@ import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import com.rishika.sqlanalyzer.config.DatabaseConfig;
 import com.rishika.sqlanalyzer.service.ConnectionTester;
+import com.rishika.sqlanalyzer.model.QueryResult;
+import com.rishika.sqlanalyzer.service.QueryExecutor;
 
 public class MainFrame extends JFrame {
 
@@ -27,6 +29,7 @@ public class MainFrame extends JFrame {
 
     private JTextArea suggestionArea;
     private final ConnectionTester connectionTester = new ConnectionTester();
+    private final QueryExecutor queryExecutor = new QueryExecutor();
     public MainFrame() {
         setTitle("SQL Performance Analyzer");
         setSize(1250, 820);
@@ -205,6 +208,7 @@ public class MainFrame extends JFrame {
     }
     private void attachEventHandlers() {
         connectButton.addActionListener(e -> testConnection());
+        executeButton.addActionListener(e -> executeQuery());
         clearButton.addActionListener(e -> queryArea.setText(""));
     }
 
@@ -244,5 +248,30 @@ public class MainFrame extends JFrame {
                 usernameField.getText().trim(),
                 new String(passwordField.getPassword())
         );
+    }
+    private void executeQuery() {
+        DatabaseConfig config = getDatabaseConfig();
+        String sql = queryArea.getText();
+
+        QueryResult result = queryExecutor.execute(config, sql);
+
+        resultTable.setModel(result.getTableModel());
+        executionTimeLabel.setText("Execution Time: " + result.getExecutionTimeMillis() + " ms");
+
+        if (result.isSuccess()) {
+            JOptionPane.showMessageDialog(
+                    this,
+                    result.getMessage(),
+                    "Query Executed",
+                    JOptionPane.INFORMATION_MESSAGE
+            );
+        } else {
+            JOptionPane.showMessageDialog(
+                    this,
+                    result.getMessage(),
+                    "SQL Error",
+                    JOptionPane.ERROR_MESSAGE
+            );
+        }
     }
 }
