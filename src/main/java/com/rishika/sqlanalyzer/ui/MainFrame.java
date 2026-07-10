@@ -14,6 +14,7 @@ import com.rishika.sqlanalyzer.model.QueryHistory;
 import com.rishika.sqlanalyzer.service.HistoryService;
 import com.rishika.sqlanalyzer.util.CSVExporter;
 import com.rishika.sqlanalyzer.model.DashboardStats;
+import com.rishika.sqlanalyzer.service.IndexRecommendationService;
 
 import java.io.File;
 import javax.swing.*;
@@ -33,6 +34,7 @@ public class MainFrame extends JFrame {
     private final ExplainService explainService = new ExplainService();
     private final ExplainAnalyzerService explainAnalyzerService = new ExplainAnalyzerService();
     private final SuggestionService suggestionService = new SuggestionService();
+    private final IndexRecommendationService indexRecommendationService = new IndexRecommendationService();
     private final HistoryService historyService = new HistoryService();
     private final CSVExporter csvExporter = new CSVExporter();
 
@@ -150,9 +152,32 @@ public class MainFrame extends JFrame {
         if (result.isSuccess()) {
             Suggestion suggestion = suggestionService.analyze(sql);
 
-            analyzerPanel.setPerformanceScore(suggestion.getPerformanceScore() + " / 100");
+            String indexRecommendation =
+                    indexRecommendationService.recommend(sql);
+
+            StringBuilder analysis = new StringBuilder();
+
+            analysis.append("Severity: ")
+                    .append(suggestion.getSeverity())
+                    .append("\n\n");
+
+            analysis.append(suggestion.getFormattedMessage());
+
+            if (!indexRecommendation.isBlank()) {
+
+                analysis.append("\n\n");
+                analysis.append("---------------------------------\n");
+                analysis.append("INDEX RECOMMENDATION\n");
+                analysis.append("---------------------------------\n\n");
+                analysis.append(indexRecommendation);
+            }
+
+            analyzerPanel.setPerformanceScore(
+                    suggestion.getPerformanceScore() + " / 100"
+            );
+
             analyzerPanel.setSuggestions(
-                    "Severity: " + suggestion.getSeverity() + "\n\n" + suggestion.getFormattedMessage()
+                    analysis.toString()
             );
 
             historyService.add(new QueryHistory(

@@ -14,8 +14,14 @@ public class SuggestionService {
             new UpdateWithoutWhereRule(),
             new LeadingWildcardLikeRule(),
             new OrderByWithoutLimitRule(),
-            new DistinctRule()
+            new DistinctRule(),
+            new SelectWithoutWhereRule(),
+            new MultipleOrRule(),
+            new NotInRule(),
+            new UnionRule()
     );
+
+
 
     public Suggestion analyze(String sql) {
 
@@ -23,7 +29,10 @@ public class SuggestionService {
             return Suggestion.emptyQuery();
         }
 
-        String normalizedSql = sql.trim().toUpperCase();
+        String normalizedSql = sql
+                .trim()
+                .replaceAll("\\s+", " ")
+                .toUpperCase();
 
         int[] score = {100};
 
@@ -62,4 +71,5 @@ public class SuggestionService {
 
         return "Critical";
     }
+
 }
