@@ -44,4 +44,7 @@ public class ResultPanel extends JPanel {
     public int getRowCount() {
         return resultTable.getRowCount();
     }
+    public JTable getResultTable() {
+        return resultTable;
+    }
 }

@@ -6,7 +6,16 @@ import com.rishika.sqlanalyzer.service.ConnectionTester;
 import com.rishika.sqlanalyzer.service.ExplainService;
 import com.rishika.sqlanalyzer.service.QueryExecutor;
 import com.rishika.sqlanalyzer.ui.panels.*;
+import com.rishika.sqlanalyzer.model.Suggestion;
+import com.rishika.sqlanalyzer.service.SuggestionService;
+import com.rishika.sqlanalyzer.model.ExplainAnalysis;
+import com.rishika.sqlanalyzer.service.ExplainAnalyzerService;
+import com.rishika.sqlanalyzer.model.QueryHistory;
+import com.rishika.sqlanalyzer.service.HistoryService;
+import com.rishika.sqlanalyzer.util.CSVExporter;
+import com.rishika.sqlanalyzer.model.DashboardStats;
 
+import java.io.File;
 import javax.swing.*;
 import java.awt.*;
 
@@ -22,6 +31,10 @@ public class MainFrame extends JFrame {
     private final ConnectionTester connectionTester = new ConnectionTester();
     private final QueryExecutor queryExecutor = new QueryExecutor();
     private final ExplainService explainService = new ExplainService();
+    private final ExplainAnalyzerService explainAnalyzerService = new ExplainAnalyzerService();
+    private final SuggestionService suggestionService = new SuggestionService();
+    private final HistoryService historyService = new HistoryService();
+    private final CSVExporter csvExporter = new CSVExporter();
 
     private DatabaseConfig activeConfig;
 
@@ -81,6 +94,8 @@ public class MainFrame extends JFrame {
         toolbarPanel.getExecuteButton().addActionListener(e -> executeQuery());
         toolbarPanel.getExplainButton().addActionListener(e -> explainQuery());
         toolbarPanel.getClearButton().addActionListener(e -> clearEditor());
+        toolbarPanel.getHistoryButton().addActionListener(e -> showHistory());
+        toolbarPanel.getExportButton().addActionListener(e -> exportResults());
     }
 
     private void testConnection() {
@@ -128,13 +143,29 @@ public class MainFrame extends JFrame {
 
         analyzerPanel.setRowsReturned(String.valueOf(result.getTableModel().getRowCount()));
         analyzerPanel.setQueryType(getQueryType(sql));
-        analyzerPanel.setPerformanceScore(result.isSuccess() ? "85 / 100" : "-- / 100");
+
 
         statusBar.setStatus(result.getMessage());
 
         if (result.isSuccess()) {
-            analyzerPanel.setSuggestions("Basic analysis complete. Advanced suggestions will be added next.");
+            Suggestion suggestion = suggestionService.analyze(sql);
+
+            analyzerPanel.setPerformanceScore(suggestion.getPerformanceScore() + " / 100");
+            analyzerPanel.setSuggestions(
+                    "Severity: " + suggestion.getSeverity() + "\n\n" + suggestion.getFormattedMessage()
+            );
+
+            historyService.add(new QueryHistory(
+                    sql,
+                    getQueryType(sql),
+                    result.getExecutionTimeMillis(),
+                    suggestion.getPerformanceScore(),
+                    "Success"
+            ));
+            DashboardStats stats = historyService.getDashboardStats();
+            analyzerPanel.updateDashboard(stats);
         } else {
+            analyzerPanel.setPerformanceScore("-- / 100");
             analyzerPanel.setSuggestions("Error: " + result.getMessage());
             JOptionPane.showMessageDialog(this, result.getMessage(), "SQL Error", JOptionPane.ERROR_MESSAGE);
         }
@@ -163,7 +194,12 @@ public class MainFrame extends JFrame {
             analyzerPanel.setSuggestions("Error: " + result.getMessage());
             JOptionPane.showMessageDialog(this, result.getMessage(), "EXPLAIN Error", JOptionPane.ERROR_MESSAGE);
         } else {
-            analyzerPanel.setSuggestions("EXPLAIN plan generated successfully. Index analysis will be added next.");
+            ExplainAnalysis analysis = explainAnalyzerService.analyze(result);
+
+            analyzerPanel.setPerformanceScore(analysis.getScore() + " / 100");
+            analyzerPanel.setSuggestions(
+                    "Severity: " + analysis.getSeverity() + "\n\n" + analysis.getMessage()
+            );
         }
     }
 
@@ -196,5 +232,56 @@ public class MainFrame extends JFrame {
         if (upper.startsWith("DROP")) return "DROP";
 
         return "OTHER";
+    }
+    private void showHistory() {
+        if (historyService.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "No query history available yet.");
+            return;
+        }
+
+        String[] columns = {"Executed At", "Type", "Time (ms)", "Score", "Status", "Query"};
+        Object[][] data = historyService.getHistory().stream()
+                .map(h -> new Object[]{
+                        h.getExecutedAt(),
+                        h.getQueryType(),
+                        h.getExecutionTimeMillis(),
+                        h.getPerformanceScore(),
+                        h.getStatus(),
+                        h.getQuery()
+                })
+                .toArray(Object[][]::new);
+
+        JTable table = new JTable(data, columns);
+        table.setRowHeight(26);
+        table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+
+        JScrollPane scrollPane = new JScrollPane(table);
+        scrollPane.setPreferredSize(new Dimension(900, 350));
+
+        JOptionPane.showMessageDialog(
+                this,
+                scrollPane,
+                "Query History",
+                JOptionPane.INFORMATION_MESSAGE
+        );
+    }
+    private void exportResults() {
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("Export Query Results");
+        fileChooser.setSelectedFile(new File("query_results.csv"));
+
+        int userChoice = fileChooser.showSaveDialog(this);
+
+        if (userChoice == JFileChooser.APPROVE_OPTION) {
+            try {
+                File file = fileChooser.getSelectedFile();
+                csvExporter.exportTable(resultPanel.getResultTable(), file);
+                statusBar.setStatus("Results exported successfully.");
+                JOptionPane.showMessageDialog(this, "Results exported successfully.");
+            } catch (Exception e) {
+                statusBar.setStatus("Export failed.");
+                JOptionPane.showMessageDialog(this, e.getMessage(), "Export Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
     }
 }

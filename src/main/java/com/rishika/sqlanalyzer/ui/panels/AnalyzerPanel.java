@@ -1,7 +1,7 @@
 package com.rishika.sqlanalyzer.ui.panels;
 
 import net.miginfocom.swing.MigLayout;
-
+import com.rishika.sqlanalyzer.model.DashboardStats;
 import javax.swing.*;
 import java.awt.*;
 
@@ -11,7 +11,7 @@ public class AnalyzerPanel extends JPanel {
     private final JLabel queryTypeLabel = new JLabel("-");
     private final JLabel rowsReturnedLabel = new JLabel("-");
     private final JTextArea suggestionsArea = new JTextArea();
-
+    private final JTextArea dashboardArea = new JTextArea();
     public AnalyzerPanel() {
         super(new MigLayout("insets 12, fill", "[grow]", "[][][][][grow]"));
 
@@ -23,7 +23,12 @@ public class AnalyzerPanel extends JPanel {
 
         queryTypeLabel.setFont(new Font("Arial", Font.BOLD, 14));
         rowsReturnedLabel.setFont(new Font("Arial", Font.BOLD, 14));
+        dashboardArea.setEditable(false);
+        dashboardArea.setFont(new Font("Arial", Font.PLAIN, 13));
+        dashboardArea.setText("Dashboard stats will appear after queries run.");
 
+        add(new JLabel("Dashboard"), "wrap");
+        add(new JScrollPane(dashboardArea), "growx, h 110!, wrap");
         suggestionsArea.setEditable(false);
         suggestionsArea.setLineWrap(true);
         suggestionsArea.setWrapStyleWord(true);
@@ -68,5 +73,14 @@ public class AnalyzerPanel extends JPanel {
 
     public void setRowsReturned(String rows) {
         rowsReturnedLabel.setText(rows);
+    }
+    public void updateDashboard(DashboardStats stats) {
+        dashboardArea.setText(
+                "Queries Executed: " + stats.getTotalQueries() + "\n" +
+                        "Average Time: " + String.format("%.2f", stats.getAverageExecutionTime()) + " ms\n" +
+                        "Average Score: " + String.format("%.2f", stats.getAverageScore()) + "\n" +
+                        "Highest Score: " + stats.getHighestScore() + "\n" +
+                        "Lowest Score: " + stats.getLowestScore()
+        );
     }
 }
