@@ -15,6 +15,7 @@ import com.rishika.sqlanalyzer.service.HistoryService;
 import com.rishika.sqlanalyzer.util.CSVExporter;
 import com.rishika.sqlanalyzer.model.DashboardStats;
 import com.rishika.sqlanalyzer.service.IndexRecommendationService;
+import com.rishika.sqlanalyzer.service.QueryRewriteService;
 
 import java.io.File;
 import javax.swing.*;
@@ -37,6 +38,7 @@ public class MainFrame extends JFrame {
     private final IndexRecommendationService indexRecommendationService = new IndexRecommendationService();
     private final HistoryService historyService = new HistoryService();
     private final CSVExporter csvExporter = new CSVExporter();
+    private final QueryRewriteService queryRewriteService = new QueryRewriteService();
 
     private DatabaseConfig activeConfig;
 
@@ -152,8 +154,8 @@ public class MainFrame extends JFrame {
         if (result.isSuccess()) {
             Suggestion suggestion = suggestionService.analyze(sql);
 
-            String indexRecommendation =
-                    indexRecommendationService.recommend(sql);
+            String indexRecommendation = indexRecommendationService.recommend(sql);
+            String rewriteSuggestion = queryRewriteService.suggestRewrite(sql);
 
             StringBuilder analysis = new StringBuilder();
 
@@ -170,6 +172,13 @@ public class MainFrame extends JFrame {
                 analysis.append("INDEX RECOMMENDATION\n");
                 analysis.append("---------------------------------\n\n");
                 analysis.append(indexRecommendation);
+            }
+            if (!rewriteSuggestion.isBlank()) {
+                analysis.append("\n\n");
+                analysis.append("---------------------------------\n");
+                analysis.append("SUGGESTED REWRITE\n");
+                analysis.append("---------------------------------\n\n");
+                analysis.append(rewriteSuggestion);
             }
 
             analyzerPanel.setPerformanceScore(
