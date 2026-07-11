@@ -6,92 +6,142 @@ import java.util.regex.Pattern;
 public class IndexRecommendationService {
 
     private static final Pattern TABLE_PATTERN =
-            Pattern.compile("FROM\\s+(\\w+)", Pattern.CASE_INSENSITIVE);
+            Pattern.compile("\\bFROM\\s+([a-zA-Z_][\\w]*)", Pattern.CASE_INSENSITIVE);
 
-    private static final Pattern WHERE_PATTERN =
-            Pattern.compile("WHERE\\s+(\\w+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern SIMPLE_WHERE_COLUMN_PATTERN =
+            Pattern.compile(
+                    "\\bWHERE\\s+([a-zA-Z_][\\w.]*)\\s*(=|>|<|>=|<=|LIKE|IN)\\b",
+                    Pattern.CASE_INSENSITIVE
+            );
 
-    private static final Pattern ORDER_PATTERN =
-            Pattern.compile("ORDER\\s+BY\\s+(\\w+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern ORDER_BY_COLUMN_PATTERN =
+            Pattern.compile(
+                    "\\bORDER\\s+BY\\s+([a-zA-Z_][\\w.]*)",
+                    Pattern.CASE_INSENSITIVE
+            );
+
+    private static final Pattern FUNCTION_IN_WHERE_PATTERN =
+            Pattern.compile(
+                    "\\bWHERE\\s+(YEAR|MONTH|DAY|DATE|LOWER|UPPER|SUBSTRING)\\s*\\(",
+                    Pattern.CASE_INSENSITIVE
+            );
 
     public String recommend(String sql) {
-
         if (sql == null || sql.isBlank()) {
             return "";
         }
 
-        String table = extract(TABLE_PATTERN, sql);
+        String normalizedSql = sql
+                .trim()
+                .replaceAll("\\s+", " ");
+
+        String upperSql = normalizedSql.toUpperCase();
+
+        // Index recommendations are currently limited to SELECT queries.
+        if (!upperSql.startsWith("SELECT")) {
+            return "";
+        }
+
+        String table = extract(TABLE_PATTERN, normalizedSql);
 
         if (table == null) {
             return "";
         }
 
-        String whereColumn = extract(WHERE_PATTERN, sql);
-        String orderColumn = extract(ORDER_PATTERN, sql);
+        /*
+         * Do not generate indexes such as:
+         * ON employees(YEAR)
+         *
+         * YEAR is a function, not a column.
+         */
+        if (FUNCTION_IN_WHERE_PATTERN.matcher(normalizedSql).find()) {
+            return """
+                    Index recommendation skipped.
 
-        StringBuilder recommendation = new StringBuilder();
+                    A SQL function is applied inside the WHERE clause.
+                    Create an index on the underlying column only after
+                    reviewing the query rewrite suggested by the analyzer.
+                    """.trim();
+        }
 
-        if (whereColumn != null && orderColumn != null) {
+        String whereColumn = removeTableAlias(
+                extract(SIMPLE_WHERE_COLUMN_PATTERN, normalizedSql)
+        );
 
-            recommendation.append("Suggested Composite Index\n\n");
+        String orderColumn = removeTableAlias(
+                extract(ORDER_BY_COLUMN_PATTERN, normalizedSql)
+        );
 
-            recommendation.append(
-                            "CREATE INDEX idx_")
-                    .append(table)
-                    .append("_")
-                    .append(whereColumn)
-                    .append("_")
-                    .append(orderColumn)
-                    .append("\nON ")
-                    .append(table)
-                    .append("(")
-                    .append(whereColumn)
-                    .append(", ")
-                    .append(orderColumn)
-                    .append(");");
+        if (whereColumn != null
+                && orderColumn != null
+                && !whereColumn.equalsIgnoreCase(orderColumn)) {
 
-            return recommendation.toString();
+            return """
+                    Suggested Composite Index
+
+                    CREATE INDEX idx_%s_%s_%s
+                    ON %s(%s, %s);
+
+                    Reason:
+                    %s is used for filtering and %s is used for sorting.
+                    """
+                    .formatted(
+                            table,
+                            whereColumn,
+                            orderColumn,
+                            table,
+                            whereColumn,
+                            orderColumn,
+                            whereColumn,
+                            orderColumn
+                    )
+                    .trim();
         }
 
         if (whereColumn != null) {
+            return """
+                    Suggested Index
 
-            recommendation.append("Suggested Index\n\n");
+                    CREATE INDEX idx_%s_%s
+                    ON %s(%s);
 
-            recommendation.append(
-                            "CREATE INDEX idx_")
-                    .append(table)
-                    .append("_")
-                    .append(whereColumn)
-                    .append("\nON ")
-                    .append(table)
-                    .append("(")
-                    .append(whereColumn)
-                    .append(");");
-
-            return recommendation.toString();
+                    Reason:
+                    %s is used in the WHERE clause.
+                    """
+                    .formatted(
+                            table,
+                            whereColumn,
+                            table,
+                            whereColumn,
+                            whereColumn
+                    )
+                    .trim();
         }
 
         if (orderColumn != null) {
+            return """
+                    Suggested Index
 
-            recommendation.append("Suggested Index\n\n");
+                    CREATE INDEX idx_%s_%s
+                    ON %s(%s);
 
-            recommendation.append(
-                            "CREATE INDEX idx_")
-                    .append(table)
-                    .append("_")
-                    .append(orderColumn)
-                    .append("\nON ")
-                    .append(table)
-                    .append("(")
-                    .append(orderColumn)
-                    .append(");");
+                    Reason:
+                    %s is used in the ORDER BY clause.
+                    """
+                    .formatted(
+                            table,
+                            orderColumn,
+                            table,
+                            orderColumn,
+                            orderColumn
+                    )
+                    .trim();
         }
 
-        return recommendation.toString();
+        return "";
     }
 
     private String extract(Pattern pattern, String sql) {
-
         Matcher matcher = pattern.matcher(sql);
 
         if (matcher.find()) {
@@ -99,5 +149,17 @@ public class IndexRecommendationService {
         }
 
         return null;
+    }
+
+    private String removeTableAlias(String column) {
+        if (column == null) {
+            return null;
+        }
+
+        int dotIndex = column.lastIndexOf('.');
+
+        return dotIndex >= 0
+                ? column.substring(dotIndex + 1)
+                : column;
     }
 }

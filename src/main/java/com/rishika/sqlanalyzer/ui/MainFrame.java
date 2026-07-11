@@ -16,7 +16,7 @@ import com.rishika.sqlanalyzer.util.CSVExporter;
 import com.rishika.sqlanalyzer.model.DashboardStats;
 import com.rishika.sqlanalyzer.service.IndexRecommendationService;
 import com.rishika.sqlanalyzer.service.QueryRewriteService;
-
+import java.awt.Taskbar;
 import java.io.File;
 import javax.swing.*;
 import java.awt.*;
@@ -43,10 +43,28 @@ public class MainFrame extends JFrame {
     private DatabaseConfig activeConfig;
 
     public MainFrame() {
-        setTitle("QueryLens - SQL Performance Analyzer");
+        setTitle("QueryLens — Rule-Based SQL Performance Analyzer");
+        try {
+            ImageIcon icon = new ImageIcon(
+                    MainFrame.class.getResource("/icons/querylens.png")
+            );
+
+            setIconImage(icon.getImage());
+
+            if (Taskbar.isTaskbarSupported()) {
+                Taskbar.getTaskbar().setIconImage(icon.getImage());
+            }
+        } catch (Exception e) {
+            System.out.println("Application icon could not be loaded: " + e.getMessage());
+        }
+
+
         setSize(1350, 850);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        getContentPane().setBackground(
+                new Color(18, 18, 20)
+        );
 
         setLayout(new BorderLayout());
 
@@ -55,6 +73,9 @@ public class MainFrame extends JFrame {
         add(statusBar, BorderLayout.SOUTH);
 
         wireEvents();
+        editorPanel.registerExecuteShortcut(
+                this::executeQuery
+        );
     }
 
     private JPanel buildHeader() {
@@ -78,7 +99,7 @@ public class MainFrame extends JFrame {
                 analyzerPanel
         );
 
-        editorAndAnalyzer.setResizeWeight(0.75);
+        editorAndAnalyzer.setResizeWeight(0.65);
         editorAndAnalyzer.setContinuousLayout(true);
 
         JSplitPane workspace = new JSplitPane(
@@ -87,7 +108,8 @@ public class MainFrame extends JFrame {
                 resultPanel
         );
 
-        workspace.setResizeWeight(0.62);
+        workspace.setResizeWeight(0.56);
+        workspace.setDividerLocation(0.56);
         workspace.setContinuousLayout(true);
 
         return workspace;
@@ -154,40 +176,28 @@ public class MainFrame extends JFrame {
         if (result.isSuccess()) {
             Suggestion suggestion = suggestionService.analyze(sql);
 
-            String indexRecommendation = indexRecommendationService.recommend(sql);
-            String rewriteSuggestion = queryRewriteService.suggestRewrite(sql);
+            String indexRecommendation =
+                    indexRecommendationService.recommend(sql);
 
-            StringBuilder analysis = new StringBuilder();
-
-            analysis.append("Severity: ")
-                    .append(suggestion.getSeverity())
-                    .append("\n\n");
-
-            analysis.append(suggestion.getFormattedMessage());
-
-            if (!indexRecommendation.isBlank()) {
-
-                analysis.append("\n\n");
-                analysis.append("---------------------------------\n");
-                analysis.append("INDEX RECOMMENDATION\n");
-                analysis.append("---------------------------------\n\n");
-                analysis.append(indexRecommendation);
-            }
-            if (!rewriteSuggestion.isBlank()) {
-                analysis.append("\n\n");
-                analysis.append("---------------------------------\n");
-                analysis.append("SUGGESTED REWRITE\n");
-                analysis.append("---------------------------------\n\n");
-                analysis.append(rewriteSuggestion);
-            }
+            String rewriteSuggestion =
+                    queryRewriteService.suggestRewrite(sql);
 
             analyzerPanel.setPerformanceScore(
                     suggestion.getPerformanceScore() + " / 100"
             );
 
-            analyzerPanel.setSuggestions(
-                    analysis.toString()
-            );
+            String analysis =
+                    "Analysis Summary\n"
+                            + "────────────────────────────\n\n"
+                            + "Severity\n"
+                            + suggestion.getSeverity()
+                            + "\n\n"
+                            + suggestion.getFormattedMessage();
+
+            analyzerPanel.setAnalysis(analysis);
+
+            analyzerPanel.setIndexRecommendation(indexRecommendation);
+            analyzerPanel.setRewriteSuggestion(rewriteSuggestion);
 
             historyService.add(new QueryHistory(
                     sql,
@@ -196,12 +206,21 @@ public class MainFrame extends JFrame {
                     suggestion.getPerformanceScore(),
                     "Success"
             ));
+
             DashboardStats stats = historyService.getDashboardStats();
             analyzerPanel.updateDashboard(stats);
         } else {
             analyzerPanel.setPerformanceScore("-- / 100");
-            analyzerPanel.setSuggestions("Error: " + result.getMessage());
-            JOptionPane.showMessageDialog(this, result.getMessage(), "SQL Error", JOptionPane.ERROR_MESSAGE);
+            analyzerPanel.setAnalysis("Error: " + result.getMessage());
+            analyzerPanel.setIndexRecommendation("");
+            analyzerPanel.setRewriteSuggestion("");
+
+            JOptionPane.showMessageDialog(
+                    this,
+                    result.getMessage(),
+                    "SQL Error",
+                    JOptionPane.ERROR_MESSAGE
+            );
         }
     }
 

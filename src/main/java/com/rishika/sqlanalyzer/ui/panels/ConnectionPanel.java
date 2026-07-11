@@ -1,5 +1,6 @@
 package com.rishika.sqlanalyzer.ui.panels;
 
+import com.rishika.sqlanalyzer.ui.theme.AppTheme;
 import net.miginfocom.swing.MigLayout;
 
 import javax.swing.*;
@@ -16,46 +17,98 @@ public class ConnectionPanel extends JPanel {
 
     public ConnectionPanel() {
         super(new MigLayout(
-                "insets 10 14 10 14, fillx",
-                "[][grow][][80!][][grow][][grow][][grow][]",
+                "insets 12 14 12 14, fillx",
+                "[][grow][][75!][][grow][][grow][][grow][]",
                 "[]"
         ));
 
-        JLabel label = new JLabel("Database Connection");
-        label.setFont(new Font("Arial", Font.BOLD, 14));
+        setBackground(AppTheme.CARD);
 
-        connectButton.setPreferredSize(new Dimension(120, 34));
+        BorderFactory.createEmptyBorder(
+                10,
+                10,
+                10,
+                10
+        );
+
+        styleField(hostField);
+        styleField(portField);
+        styleField(databaseField);
+        styleField(usernameField);
+        styleField(passwordField);
+
+        connectButton.setPreferredSize(new Dimension(115, 36));
         connectButton.setFont(new Font("Arial", Font.BOLD, 13));
+        connectButton.setBackground(AppTheme.BLUE);
+        connectButton.setForeground(Color.WHITE);
+        connectButton.setFocusPainted(false);
+        connectButton.setCursor(
+                Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+        );
 
-        add(label, "span, wrap");
+        connectButton.putClientProperty(
+                "JButton.buttonType",
+                "roundRect"
+        );
 
-        add(new JLabel("Host"));
+        add(createLabel("Host"));
         add(hostField, "growx");
 
-        add(new JLabel("Port"));
-        add(portField);
+        add(createLabel("Port"));
+        add(portField, "growx");
 
-        add(new JLabel("Database"));
+        add(createLabel("Database"));
         add(databaseField, "growx");
 
-        add(new JLabel("Username"));
+        add(createLabel("Username"));
         add(usernameField, "growx");
 
-        add(new JLabel("Password"));
+        add(createLabel("Password"));
         add(passwordField, "growx");
 
         add(connectButton);
     }
 
-    public String getHost() { return hostField.getText().trim(); }
+    private JLabel createLabel(String text) {
+        JLabel label = new JLabel(text);
+        label.setForeground(AppTheme.SUBTEXT);
+        label.setFont(new Font("Arial", Font.PLAIN, 12));
+        return label;
+    }
 
-    public String getPort() { return portField.getText().trim(); }
+    private void styleField(JTextField field) {
+        field.setBackground(AppTheme.SURFACE);
+        field.setForeground(AppTheme.TEXT);
+        field.setCaretColor(AppTheme.TEXT);
+        field.setSelectionColor(AppTheme.SELECTION);
 
-    public String getDatabase() { return databaseField.getText().trim(); }
+        field.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(AppTheme.BORDER),
+                BorderFactory.createEmptyBorder(7, 9, 7, 9)
+        ));
+    }
 
-    public String getUsername() { return usernameField.getText().trim(); }
+    public String getHost() {
+        return hostField.getText().trim();
+    }
 
-    public String getPassword() { return new String(passwordField.getPassword()); }
+    public String getPort() {
+        return portField.getText().trim();
+    }
 
-    public JButton getConnectButton() { return connectButton; }
+    public String getDatabase() {
+        return databaseField.getText().trim();
+    }
+
+    public String getUsername() {
+        return usernameField.getText().trim();
+    }
+
+    public String getPassword() {
+        return new String(passwordField.getPassword());
+    }
+
+    public JButton getConnectButton() {
+        return connectButton;
+    }
 }

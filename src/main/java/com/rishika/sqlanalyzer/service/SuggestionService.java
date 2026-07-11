@@ -18,7 +18,12 @@ public class SuggestionService {
             new SelectWithoutWhereRule(),
             new MultipleOrRule(),
             new NotInRule(),
-            new UnionRule()
+            new UnionRule(),
+            new CountStarRule(),
+            new HavingWithoutGroupByRule(),
+            new CrossJoinRule(),
+            new FunctionOnColumnRule(),
+            new ImplicitJoinRule()
     );
 
 
